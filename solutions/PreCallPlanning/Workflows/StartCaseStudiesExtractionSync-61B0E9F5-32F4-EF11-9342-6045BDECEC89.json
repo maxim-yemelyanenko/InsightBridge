@@ -1,0 +1,221 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_microsoftcopilotstudio": {
+        "runtimeSource": "invoker",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedmicrosoftcopilotstudio_7d1d9"
+        },
+        "api": {
+          "name": "shared_microsoftcopilotstudio"
+        }
+      },
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "crbdb_akvelonCaseStudiesAgent.shared_commondataserviceforapps.shared-commondataser-5a8d70a3-f756-4df4-b179-273b41809a1f"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "6cbeec9e-8575-4408-af37-ed4b2cefa116"
+          },
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "description": "PCP Case DB Row ID",
+                  "title": "RowId",
+                  "type": "string",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "text_1": {
+                  "description": "PCP Case Summary text",
+                  "title": "SummaryText",
+                  "type": "string",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "text",
+                "text_1"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Create_request_message": {
+          "runAfter": {
+            "ParseSummaryMessage": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "4c50d070-56f2-4a67-b316-638e1f635e46"
+          },
+          "type": "Compose",
+          "inputs": "@json(concat('{\"rowId\": \"', triggerBody()?['text'], '\", \"summaryText\": \"', body('ParseSummaryMessage')?['summary'], '\\n', body('ParseSummaryMessage')?['painPoints'], '\\n', body('ParseSummaryMessage')?['technicalExpertise'], '\\n', '\"}'))"
+        },
+        "Execute_Copilot": {
+          "runAfter": {
+            "Create_request_message": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "f9887af5-8432-41d2-9d04-8185d8daf95f"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "Copilot": "crbdb_akvelonCaseStudiesAgent",
+              "body/message": "@outputs('Create_request_message')"
+            },
+            "host": {
+              "connectionName": "shared_microsoftcopilotstudio",
+              "operationId": "ExecuteCopilot",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftcopilotstudio"
+            },
+            "authentication": {
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+              "type": "Raw"
+            }
+          }
+        },
+        "ParseSummaryMessage": {
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "fd2a96d3-5d2f-4d9e-83a1-fe07952b63ef"
+          },
+          "type": "ParseJson",
+          "inputs": {
+            "content": "@triggerBody()?['text_1']",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "painPoints": {
+                  "type": "string"
+                },
+                "technicalExpertise": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "Respond_to_a_Power_App_or_flow": {
+          "runAfter": {
+            "Do_until": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "6eb1e9ac-f5d8-4adb-b115-c2b46a62296b"
+          },
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "expertisemessage": "@{outputs('Get_actual_DB_row_state')?['body/crbdb_relevantakvelonexpertise']}"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "expertisemessage": {
+                  "title": "expertiseMessage",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "Do_until": {
+          "actions": {
+            "Wait_5_sec": {
+              "runAfter": {},
+              "metadata": {
+                "operationMetadataId": "1a0d46d3-04cf-45fd-9a00-01ca0cb874c1"
+              },
+              "type": "Wait",
+              "inputs": {
+                "interval": {
+                  "count": 5,
+                  "unit": "Second"
+                }
+              }
+            },
+            "Get_actual_DB_row_state": {
+              "runAfter": {
+                "Wait_5_sec": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "35f614e3-38d6-4015-b10d-cc4f619142a9"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "organization": "https://org0f1ce357.crm.dynamics.com",
+                  "entityName": "crbdb_precallplanningcases",
+                  "recordId": "@triggerBody()?['text']"
+                },
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItemWithOrganization",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "runAfter": {
+            "Execute_Copilot": [
+              "Succeeded"
+            ]
+          },
+          "expression": "@not(equals(empty(outputs('Get_actual_DB_row_state')?['body/crbdb_relevantakvelonexpertise']),true))",
+          "limit": {
+            "count": 12,
+            "timeout": "PT1H"
+          },
+          "metadata": {
+            "operationMetadataId": "02f4ad6d-f480-4a2d-a4f9-82f72d3fde1f"
+          },
+          "type": "Until"
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}
