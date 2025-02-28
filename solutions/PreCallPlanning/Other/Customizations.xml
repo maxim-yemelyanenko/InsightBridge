@@ -11,6 +11,8 @@
   <optionsets />
   <MobileOfflineProfiles />
   <CustomControls />
+  <AppModuleSiteMaps />
+  <AppModules />
   <EntityDataProviders />
   <CanvasApps />
   <AIModels>
